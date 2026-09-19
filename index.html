@@ -1,0 +1,2214 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Presensi NGL GMH JATIM</title>
+  
+  <link rel="icon" type="image/png" href="LOGO NGL Jatim tnpa bckg.png">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Html5Qrcode -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- html2canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- Firebase SDK Compatibility Version (Sinkronisasi Antar-Perangkat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#1d4ed8',
+              600: '#1e40af',
+              700: '#1d3557',
+              800: '#0f172a',
+              900: '#0b132b',
+            },
+            ngl: {
+              navy: '#14466b',
+              gold: '#fab818',
+              surface: '#f8fafc',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .scanner-laser {
+      position: absolute;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, rgba(250,184,24,0) 0%, rgba(250,184,24,1) 50%, rgba(250,184,24,0) 100%);
+      box-shadow: 0 0 14px 2px rgba(250, 184, 24, 0.85);
+      animation: scanning 2.2s infinite ease-in-out;
+    }
+
+    @keyframes scanning {
+      0% { top: 6%; opacity: 0.2; }
+      50% { top: 92%; opacity: 1; }
+      100% { top: 6%; opacity: 0.2; }
+    }
+
+    /* Fixed ID Card Container */
+    .id-card-wrap {
+      width: 320px;
+      min-height: 520px;
+      background: linear-gradient(160deg, #0f172a 0%, #14466b 55%, #0b2236 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-sizing: border-box;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #print-section, #print-section * {
+        visibility: visible;
+      }
+      #print-section {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+
+  <!-- Inisialisasi Firebase & Cloud Database -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyA35RdzgsY-CYuCXoX_Q8cO5gtOIXauAhA",
+      authDomain: "prensi-ngl.firebaseapp.com",
+      projectId: "prensi-ngl",
+      storageBucket: "prensi-ngl.firebasestorage.app",
+      messagingSenderId: "856815023157",
+      appId: "1:856815023157:web:f744ce0662e7d2d16ded7c",
+      measurementId: "G-2KJ5NGKQ52"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+  </script>
+</head>
+<body class="h-full flex flex-col text-slate-800 antialiased selection:bg-amber-500 selection:text-white">
+
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- Modal Konfirmasi Universal -->
+  <div id="custom-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl transform transition-all scale-95 duration-200 border border-slate-100" id="custom-modal-box">
+      <div class="flex items-center gap-3 mb-4" id="custom-modal-header">
+        <div class="w-10 h-10 rounded-full flex items-center justify-center bg-amber-100 text-amber-700" id="custom-modal-icon">
+          <i data-lucide="info" class="w-5 h-5"></i>
+        </div>
+        <h3 class="text-lg font-bold text-slate-800" id="custom-modal-title">Konfirmasi</h3>
+      </div>
+      <p class="text-slate-600 text-sm mb-6 leading-relaxed" id="custom-modal-message">Apakah Anda yakin ingin melanjutkan tindakan ini?</p>
+      <div class="flex justify-end gap-3" id="custom-modal-actions">
+        <button id="custom-modal-cancel" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition">Batal</button>
+        <button id="custom-modal-confirm" class="px-4 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm hover:bg-amber-600 shadow-md transition">Konfirmasi</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-root" class="min-h-screen flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+      <div class="w-full px-3 sm:px-4 lg:px-6">
+        <div class="flex items-center justify-between h-16">
+          
+          <div class="flex items-center gap-2 sm:gap-3">
+            <button id="btn-sidebar-toggle" class="lg:hidden p-1.5 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 focus:outline-none">
+              <i data-lucide="menu" class="w-6 h-6"></i>
+            </button>
+            <div class="flex items-center gap-2 sm:gap-3">
+              <div class="w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-xs p-1 flex items-center justify-center overflow-hidden shrink-0">
+                <img src="LOGO NGL Jatim tnpa bckg.png" alt="Logo NGL Jatim" class="w-full h-full object-contain" onerror="this.src='Proposal NGL GMH JATIM.jpg'">
+              </div>
+              <div>
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                  <span class="font-black text-slate-900 tracking-tight text-base sm:text-lg">PRESENSI NGL GMH</span>
+                  <span class="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-amber-300">JATIM</span>
+                </div>
+                <p class="text-[11px] text-slate-500 font-bold hidden sm:block">Next Gen Leader</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Realtime Clock & Sync Indicator -->
+          <div class="flex items-center gap-2 sm:gap-3">
+            <div class="flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span class="hidden sm:inline">Online Cloud</span>
+            </div>
+            <div class="flex flex-col text-right">
+              <span id="header-time" class="text-xs sm:text-sm font-bold text-slate-800 font-mono tracking-tight">00:00:00 WIB</span>
+              <span id="header-date" class="text-[10px] sm:text-xs text-slate-500">Memuat tanggal...</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+      
+      <!-- Sidebar Navigation -->
+      <aside id="main-sidebar" class="fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col">
+        
+        <div class="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto no-scrollbar">
+          <div class="px-3 pb-2 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+            Menu Utama
+          </div>
+
+          <button onclick="app.navTo('dashboard')" class="nav-item flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold transition" data-view="dashboard">
+            <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+            <span>Dashboard</span>
+          </button>
+
+          <button onclick="app.navTo('scanner')" class="nav-item flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold transition bg-amber-500/10 text-amber-900" data-view="scanner">
+            <i data-lucide="qr-code" class="w-4 h-4 text-amber-600"></i>
+            <span>Scan Presensi</span>
+            <span class="ml-auto bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full">LIVE</span>
+          </button>
+
+          <button onclick="app.navTo('activities')" class="nav-item flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 hover:bg-slate-100" data-view="activities">
+            <i data-lucide="calendar" class="w-4 h-4"></i>
+            <span>Kegiatan NGL</span>
+          </button>
+
+          <button onclick="app.navTo('members')" class="nav-item flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 hover:bg-slate-100" data-view="members">
+            <i data-lucide="users" class="w-4 h-4"></i>
+            <span>Data Peserta NGL</span>
+          </button>
+
+          <button onclick="app.navTo('history')" class="nav-item flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 hover:bg-slate-100" data-view="history">
+            <i data-lucide="clock" class="w-4 h-4"></i>
+            <span>Riwayat Presensi</span>
+          </button>
+
+          <button onclick="app.navTo('reports')" class="nav-item flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 hover:bg-slate-100" data-view="reports">
+            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+            <span>Laporan & Statistik</span>
+          </button>
+
+          <div class="pt-4 px-3 pb-2 text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">
+            Konfigurasi
+          </div>
+
+          <button onclick="app.navTo('settings')" class="nav-item flex items-center gap-3 w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold transition text-slate-600 hover:bg-slate-100" data-view="settings">
+            <i data-lucide="sliders" class="w-4 h-4"></i>
+            <span>Pengaturan</span>
+          </button>
+        </div>
+
+        <div class="p-4 border-t border-slate-100 bg-slate-50/50 m-2 rounded-2xl">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-white border border-slate-200 shadow-xs p-1 flex items-center justify-center overflow-hidden shrink-0">
+              <img src="LOGO NGL Jatim tnpa bckg.png" alt="Icon NGL" class="w-full h-full object-contain" onerror="this.src='Proposal NGL GMH JATIM.jpg'">
+            </div>
+            <div class="text-xs">
+              <p class="font-bold text-slate-800">GMH JATIM</p>
+              <p class="text-[11px] text-slate-500">Next Gen Leader</p>
+            </div>
+          </div>
+        </div>
+
+      </aside>
+
+      <div id="sidebar-backdrop" class="fixed inset-0 bg-slate-900/40 z-30 hidden lg:hidden"></div>
+
+      <main class="flex-1 overflow-y-auto bg-slate-50/60 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8">
+        <div class="max-w-7xl mx-auto">
+
+          <!-- VIEW: DASHBOARD -->
+          <section id="view-dashboard" class="space-y-6">
+            <div class="bg-gradient-to-r from-slate-900 via-[#14466b] to-[#0f2a42] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+              <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-amber-300 text-xs font-semibold mb-3 backdrop-blur-sm">
+                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    Sistem Operasional Presensi Jawa Timur
+                  </div>
+                  <h1 class="text-2xl sm:text-3xl font-black tracking-tight">Ahlan wa Sahlan, Presensi NGL GMH JATIM</h1>
+                  <p class="text-slate-300 text-sm mt-1.5 max-w-xl">
+                    Sistem pencatatan kehadiran digital berbasis QR Code real-time peserta Next Gen Leader se-Jawa Timur.
+                  </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                  <button onclick="app.navTo('scanner')" class="px-5 py-3 rounded-2xl bg-amber-500 text-slate-950 font-black text-sm hover:bg-amber-400 transition flex items-center gap-2.5 shadow-lg shadow-amber-500/20">
+                    <i data-lucide="qr-code" class="w-5 h-5"></i>
+                    <span>Buka Scanner Kamera</span>
+                  </button>
+                  <button onclick="app.openManualModal()" class="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition backdrop-blur-sm flex items-center gap-2">
+                    <i data-lucide="edit-3" class="w-4 h-4"></i>
+                    <span>Input Presensi Manual</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Active Banner -->
+            <div id="dashboard-active-activity-banner" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold">
+                  <i data-lucide="calendar-check" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <p class="text-xs font-bold uppercase text-amber-800 tracking-wide">Kegiatan Aktif Saat Ini</p>
+                  <h4 id="dash-active-event-title" class="text-sm font-extrabold text-slate-900">Leadership Training Next Gen Leader Jatim</h4>
+                  <p id="dash-active-event-details" class="text-xs text-slate-600">Surabaya &bull; Presensi Masuk Aktif</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="app.navTo('scanner')" class="px-3.5 py-1.5 bg-amber-500 text-slate-950 text-xs font-bold rounded-xl hover:bg-amber-400 transition">
+                  Scan untuk Acara Ini
+                </button>
+              </div>
+            </div>
+
+            <!-- Statistic Cards Grid -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+              <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-400 uppercase">Total Kader</span>
+                  <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <h3 id="stat-total-members" class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">0</h3>
+                  <p class="text-[11px] text-slate-500 mt-1">Terdaftar di database Jatim</p>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-400 uppercase">Hadir Hari Ini</span>
+                  <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <h3 id="stat-today-attended" class="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">0</h3>
+                  <p id="stat-today-rate" class="text-[11px] text-emerald-700 font-semibold mt-1">0% dari total peserta</p>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-400 uppercase">Belum Hadir</span>
+                  <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <i data-lucide="clock" class="w-4 h-4"></i>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <h3 id="stat-today-absent" class="text-2xl sm:text-3xl font-black text-amber-600 tracking-tight">0</h3>
+                  <p class="text-[11px] text-slate-500 mt-1">Belum tercatat hari ini</p>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-400 uppercase">Total Riwayat</span>
+                  <div class="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                    <i data-lucide="file-check-2" class="w-4 h-4"></i>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <h3 id="stat-total-records" class="text-2xl sm:text-3xl font-black text-purple-600 tracking-tight">0</h3>
+                  <p class="text-[11px] text-slate-500 mt-1">Semua kegiatan & sesi</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+                <div class="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 class="text-base font-bold text-slate-900">Aktivitas Presensi 7 Hari Terakhir</h3>
+                    <p class="text-xs text-slate-500">Statistik kehadiran peserta Next Gen Leader Jatim</p>
+                  </div>
+                  <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-lg">Realtime Cloud Data</span>
+                </div>
+                <div class="h-64 sm:h-72">
+                  <canvas id="chart-attendance-trend"></canvas>
+                </div>
+              </div>
+
+              <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col">
+                <div class="mb-4">
+                  <h3 class="text-base font-bold text-slate-900">Distribusi Domisili Jatim</h3>
+                  <p class="text-xs text-slate-500">Sebaran kader per kota / daerah</p>
+                </div>
+                <div class="flex-1 flex items-center justify-center h-56">
+                  <canvas id="chart-attendance-region"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent Presence -->
+            <div class="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="text-base font-bold text-slate-900">Presensi Masuk Terbaru</h3>
+                  <p class="text-xs text-slate-500">Peserta yang baru saja melakukan scan atau input manual</p>
+                </div>
+                <button onclick="app.navTo('history')" class="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1">
+                  Lihat Semua <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-slate-50 text-slate-500 font-bold uppercase border-y border-slate-100">
+                    <tr>
+                      <th class="py-3 px-4">Waktu</th>
+                      <th class="py-3 px-4">Peserta</th>
+                      <th class="py-3 px-4">Kampus & Domisili</th>
+                      <th class="py-3 px-4">Kegiatan</th>
+                      <th class="py-3 px-4">Sesi Presensi</th>
+                      <th class="py-3 px-4 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dashboard-recent-tbody" class="divide-y divide-slate-100 text-slate-700">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW: SCANNER -->
+          <section id="view-scanner" class="hidden space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 class="text-2xl font-black text-slate-900 tracking-tight">Kamera Scan QR Presensi</h2>
+                <p class="text-xs sm:text-sm text-slate-500">Arahkan kamera ke QR Code Peserta Next Gen Leader Jatim untuk mencatat kehadiran.</p>
+              </div>
+              
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs font-semibold text-slate-500">Sesi Presensi:</span>
+                <select id="scanner-session-type" class="bg-white border border-slate-200 text-xs font-bold rounded-xl px-3 py-2 text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
+                  <option value="Presensi Masuk">Presensi Masuk</option>
+                  <option value="Presensi Kegiatan">Presensi Kegiatan</option>
+                </select>
+                <select id="scanner-activity-select" class="bg-white border border-slate-200 text-xs font-bold rounded-xl px-3 py-2 text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none">
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div class="lg:col-span-8 bg-slate-900 rounded-3xl p-4 sm:p-6 text-white shadow-xl flex flex-col justify-between relative overflow-hidden">
+                <div class="flex items-center justify-between z-10 pb-4 border-b border-slate-800">
+                  <div class="flex items-center gap-2">
+                    <span id="camera-status-dot" class="w-3 h-3 rounded-full bg-red-500"></span>
+                    <span id="camera-status-label" class="text-xs font-mono uppercase tracking-wider text-slate-300">Kamera Mati</span>
+                  </div>
+                  
+                  <div class="flex items-center gap-2">
+                    <button id="btn-switch-camera" onclick="app.switchCameraFacing()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs flex items-center gap-1.5 transition">
+                      <i data-lucide="flip-horizontal" class="w-4 h-4"></i>
+                      <span class="hidden sm:inline">Ganti Kamera</span>
+                    </button>
+                    <button id="btn-toggle-sound" onclick="app.toggleSound()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition">
+                      <i data-lucide="volume-2" class="w-4 h-4" id="sound-icon"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="relative my-4 flex-1 min-h-[300px] sm:min-h-[400px] flex items-center justify-center bg-black/40 rounded-2xl overflow-hidden border border-slate-800">
+                  <div id="reader" class="w-full h-full object-cover"></div>
+
+                  <div id="scanner-overlay" class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div class="relative w-56 h-56 sm:w-72 sm:h-72 border-2 border-amber-400/80 rounded-3xl overflow-hidden shadow-[0_0_0_9999px_rgba(15,23,42,0.65)]">
+                      <div class="scanner-laser"></div>
+                      <div class="absolute top-2 left-2 w-5 h-5 border-t-4 border-l-4 border-amber-400 rounded-tl-lg"></div>
+                      <div class="absolute top-2 right-2 w-5 h-5 border-t-4 border-r-4 border-amber-400 rounded-tr-lg"></div>
+                      <div class="absolute bottom-2 left-2 w-5 h-5 border-b-4 border-l-4 border-amber-400 rounded-bl-lg"></div>
+                      <div class="absolute bottom-2 right-2 w-5 h-5 border-b-4 border-r-4 border-amber-400 rounded-br-lg"></div>
+                      <div class="absolute inset-x-0 bottom-4 text-center">
+                        <span class="px-3 py-1 bg-black/70 backdrop-blur-sm text-[11px] font-semibold text-amber-300 rounded-full">
+                          Posisikan QR di dalam kotak
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div id="camera-inactive-view" class="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center p-6 text-center z-20">
+                    <div class="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-amber-400 mb-4">
+                      <i data-lucide="camera" class="w-8 h-8"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-1">Kamera Siap Diaktifkan</h3>
+                    <p class="text-xs text-slate-400 max-w-sm mb-5">
+                      Browser akan meminta izin akses kamera untuk memindai QR Code peserta secara langsung.
+                    </p>
+                    <button onclick="app.startScanner()" class="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-sm transition shadow-lg shadow-amber-500/30 flex items-center gap-2">
+                      <i data-lucide="video" class="w-4 h-4"></i>
+                      <span>Aktifkan Kamera Sekarang</span>
+                    </button>
+                    <p class="text-[11px] text-slate-500 mt-4">
+                      Jika kamera bermasalah, gunakan opsi 
+                      <button onclick="app.openManualModal()" class="text-amber-400 underline font-semibold ml-1">Presensi Manual</button>
+                    </p>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800 z-10">
+                  <div class="flex items-center gap-2">
+                    <button id="btn-start-scanner" onclick="app.startScanner()" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold transition flex items-center gap-2">
+                      <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                      <span>Mulai Kamera</span>
+                    </button>
+                    <button id="btn-stop-scanner" onclick="app.stopScanner()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition flex items-center gap-2">
+                      <i data-lucide="square" class="w-3.5 h-3.5"></i>
+                      <span>Hentikan</span>
+                    </button>
+                  </div>
+                  
+                  <button onclick="app.openManualModal()" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition flex items-center gap-2">
+                    <i data-lucide="keyboard" class="w-3.5 h-3.5"></i>
+                    <span>Input ID / Presensi Manual</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Result Feedback Card -->
+              <div class="lg:col-span-4 flex flex-col gap-5">
+                <div id="scan-feedback-card" class="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Hasil Scan Terakhir</h4>
+                      <span id="scan-feedback-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">Menunggu Scan</span>
+                    </div>
+
+                    <div id="scan-result-body" class="py-6 text-center flex flex-col items-center">
+                      <div class="w-20 h-20 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mb-3 shadow-inner">
+                        <i data-lucide="user-check" class="w-10 h-10"></i>
+                      </div>
+                      <p class="text-sm font-bold text-slate-700">Belum Ada Presensi Masuk</p>
+                      <p class="text-xs text-slate-400 mt-1 max-w-xs">
+                        Arahkan kamera ke QR Code Peserta Next Gen Leader JATIM.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <div class="flex justify-between items-center text-xs mb-2">
+                      <span class="text-slate-500">Scan Sukses Sesi Ini:</span>
+                      <span id="scanner-session-count" class="font-extrabold text-slate-900">0 Peserta</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                      <span class="text-slate-500">Cegah Duplikasi:</span>
+                      <span class="font-semibold text-emerald-600">Aktif (1x per kegiatan)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="bg-amber-50/70 border border-amber-200/60 rounded-3xl p-5 text-amber-950">
+                  <div class="flex items-center gap-2.5 font-bold text-xs mb-2 text-amber-900">
+                    <i data-lucide="lightbulb" class="w-4 h-4 text-amber-600"></i>
+                    <span>Tips Pemindaian Cepat</span>
+                  </div>
+                  <ul class="text-xs text-amber-900/80 space-y-1.5 list-disc list-inside leading-relaxed">
+                    <li>Pastikan pencahayaan cukup dan layar HP peserta tidak terlalu redup.</li>
+                    <li>Jaga jarak sekitar 15 - 30 cm antara kamera dan QR Code.</li>
+                    <li>Gunakan tombol "Ganti Kamera" untuk beralih ke kamera belakang HP.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW: ACTIVITIES MANAGEMENT -->
+          <section id="view-activities" class="hidden space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 class="text-2xl font-black text-slate-900 tracking-tight">Manajemen Kegiatan & Agenda</h2>
+                <p class="text-xs sm:text-sm text-slate-500">Kelola Agenda Training Next Gen Leader Jawa Timur.</p>
+              </div>
+              <button onclick="app.openActivityModal()" class="px-4 py-2.5 rounded-xl bg-[#14466b] hover:bg-[#0f3450] text-white font-bold text-xs transition flex items-center gap-2 shadow-md">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Buat Kegiatan Baru</span>
+              </button>
+            </div>
+
+            <div id="activities-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            </div>
+          </section>
+
+          <!-- VIEW: MEMBERS MANAGEMENT -->
+          <section id="view-members" class="hidden space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 class="text-2xl font-black text-slate-900 tracking-tight">Database Peserta Next Gen Leader JATIM</h2>
+                <p class="text-xs sm:text-sm text-slate-500">Daftar seluruh kader se-Jawa Timur beserta Kartu Digital & QR Code.</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2.5">
+                <button onclick="app.openMemberModal()" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs transition flex items-center gap-2 shadow-md">
+                  <i data-lucide="user-plus" class="w-4 h-4"></i>
+                  <span>Tambah Peserta NGL</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row gap-3 items-center justify-between">
+              <div class="relative w-full md:w-96">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                <input type="text" id="member-search-input" onkeyup="app.filterMembers()" placeholder="Cari Nama, ID, Domisili, atau Kampus..." class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 outline-none">
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-200">
+                    <tr>
+                      <th class="py-3.5 px-4">Nama Lengkap & TTL</th>
+                      <th class="py-3.5 px-4">ID Peserta / Barcode</th>
+                      <th class="py-3.5 px-4">Perguruan Tinggi & Jurusan</th>
+                      <th class="py-3.5 px-4">Domisili</th>
+                      <th class="py-3.5 px-4">Kontak (Email / WA)</th>
+                      <th class="py-3.5 px-4 text-center">ID Card & Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="members-tbody" class="divide-y divide-slate-100 text-slate-700">
+                  </tbody>
+                </table>
+              </div>
+              <div id="members-empty-state" class="p-8 text-center hidden">
+                <p class="text-sm font-bold text-slate-600">Tidak ada Peserta yang cocok dengan filter</p>
+                <p class="text-xs text-slate-400 mt-1">Coba sesuaikan kata kunci pencarian Anda.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW: ATTENDANCE HISTORY -->
+          <section id="view-history" class="hidden space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 class="text-2xl font-black text-slate-900 tracking-tight">Riwayat Presensi NGL GMH JATIM</h2>
+                <p class="text-xs sm:text-sm text-slate-500">Log lengkap seluruh rekaman kehadiran Peserta Next Gen Leader Jawa Timur.</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button onclick="app.exportHistoryCSV()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs transition flex items-center gap-2">
+                  <i data-lucide="download" class="w-4 h-4"></i>
+                  <span>Export CSV (Excel)</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Cari Nama / ID</label>
+                <input type="text" id="hist-filter-search" oninput="app.filterHistory()" placeholder="Ketik kata kunci..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500">
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Kegiatan</label>
+                <select id="hist-filter-activity" onchange="app.filterHistory()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500">
+                  <option value="">Semua Kegiatan</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Jenis Presensi</label>
+                <select id="hist-filter-type" onchange="app.filterHistory()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500">
+                  <option value="">Semua Sesi</option>
+                  <option value="Presensi Masuk">Presensi Masuk</option>
+                  <option value="Presensi Kegiatan">Presensi Kegiatan</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Filter Tanggal</label>
+                <input type="date" id="hist-filter-date" onchange="app.filterHistory()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500">
+              </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-slate-50 text-slate-500 font-bold uppercase border-b border-slate-200">
+                    <tr>
+                      <th class="py-3.5 px-4">Waktu & Tanggal</th>
+                      <th class="py-3.5 px-4">Nama Peserta</th>
+                      <th class="py-3.5 px-4">ID Peserta</th>
+                      <th class="py-3.5 px-4">Domisili / Kampus</th>
+                      <th class="py-3.5 px-4">Kegiatan</th>
+                      <th class="py-3.5 px-4">Sesi Presensi</th>
+                      <th class="py-3.5 px-4">Metode</th>
+                      <th class="py-3.5 px-4 text-center">Opsi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="history-tbody" class="divide-y divide-slate-100 text-slate-700">
+                  </tbody>
+                </table>
+              </div>
+              <div id="history-empty-state" class="p-8 text-center hidden">
+                <p class="text-sm font-bold text-slate-600">Belum ada riwayat presensi yang sesuai</p>
+                <p class="text-xs text-slate-400 mt-1">Lakukan scan QR Code atau input presensi terlebih dahulu.</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW: REPORTS & ANALYTICS -->
+          <section id="view-reports" class="hidden space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 class="text-2xl font-black text-slate-900 tracking-tight">Laporan & Statistik Kehadiran</h2>
+                <p class="text-xs sm:text-sm text-slate-500">Analisis komprehensif kehadiran kader Next Gen Leader Jawa Timur.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="app.exportHistoryCSV()" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition flex items-center gap-2 shadow-md">
+                  <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                  <span>Download Rekap Lengkap (.CSV)</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+                <p class="text-xs font-bold text-slate-400 uppercase">Tingkat Kehadiran</p>
+                <h3 id="rep-rate" class="text-2xl font-black text-emerald-600 mt-1">0%</h3>
+                <p class="text-[11px] text-slate-500 mt-0.5">Rata-rata kegiatan aktif</p>
+              </div>
+              <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+                <p class="text-xs font-bold text-slate-400 uppercase">Total Entri Presensi</p>
+                <h3 id="rep-total-scans" class="text-2xl font-black text-slate-900 mt-1">0</h3>
+                <p class="text-[11px] text-slate-500 mt-0.5">Total scan & manual</p>
+              </div>
+              <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+                <p class="text-xs font-bold text-slate-400 uppercase">Kegiatan Terlaksana</p>
+                <h3 id="rep-events-count" class="text-2xl font-black text-blue-600 mt-1">0</h3>
+                <p class="text-[11px] text-slate-500 mt-0.5">Agenda terselenggara</p>
+              </div>
+              <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+                <p class="text-xs font-bold text-slate-400 uppercase">Kader Teraktif</p>
+                <h3 id="rep-top-member" class="text-lg font-black text-amber-700 mt-1 truncate">-</h3>
+                <p id="rep-top-member-sub" class="text-[11px] text-slate-500 mt-0.5">0 kehadiran</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+                <h3 class="text-base font-bold text-slate-900 mb-1">Partisipasi per Domisili</h3>
+                <p class="text-xs text-slate-500 mb-4">Jumlah kehadiran akumulatif per kota / daerah</p>
+                <div class="h-64">
+                  <canvas id="chart-report-regions"></canvas>
+                </div>
+              </div>
+
+              <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+                <h3 class="text-base font-bold text-slate-900 mb-1">Distribusi Sesi Presensi</h3>
+                <p class="text-xs text-slate-500 mb-4">Komparasi sesi yang tercatat</p>
+                <div class="h-64 flex items-center justify-center">
+                  <canvas id="chart-report-sessions"></canvas>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- VIEW: SETTINGS -->
+          <section id="view-settings" class="hidden space-y-6">
+            <div>
+              <h2 class="text-2xl font-black text-slate-900 tracking-tight">Pengaturan Sistem</h2>
+              <p class="text-xs sm:text-sm text-slate-500">Konfigurasi NGL GMH JATIM dan kamera scanner.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-5 max-w-3xl">
+              <h3 class="text-base font-bold text-slate-900 pb-3 border-b border-slate-100">Konfigurasi Umum NGL GMH JATIM</h3>
+              
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Nama NGL GMH JATIM</label>
+                  <input type="text" id="setting-org-name" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium" value="Next Gen Leader">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Wilayah Koordinator</label>
+                  <input type="text" id="setting-corwil" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium" value="Jawa Timur">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Mode Kamera Default</label>
+                  <select id="setting-camera-mode" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium">
+                    <option value="environment">Kamera Belakang (Environment - HP)</option>
+                    <option value="user">Kamera Depan (User / Webcam)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">Toleransi Scan Berulang</label>
+                  <select id="setting-duplicate-rule" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium">
+                    <option value="block">Cegah Duplikasi (1x Scan per Sesi Kegiatan)</option>
+                    <option value="allow">Izinkan Scan Berulang</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="pt-2 flex justify-end">
+                <button onclick="app.saveSettings()" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition shadow-md">
+                  Simpan Perubahan
+                </button>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </main>
+
+    </div>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="lg:hidden fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 z-30 px-3 py-2 flex items-center justify-around shadow-lg">
+      <button onclick="app.navTo('dashboard')" class="mobile-nav-btn flex flex-col items-center gap-1 text-slate-400 p-1 font-semibold text-[10px]" data-view="dashboard">
+        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+        <span>Home</span>
+      </button>
+      <button onclick="app.navTo('scanner')" class="mobile-nav-btn flex flex-col items-center gap-1 text-slate-400 p-1 font-semibold text-[10px]" data-view="scanner">
+        <div class="w-10 h-10 -mt-5 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/40">
+          <i data-lucide="qr-code" class="w-5 h-5"></i>
+        </div>
+        <span>Scan</span>
+      </button>
+      <button onclick="app.navTo('activities')" class="mobile-nav-btn flex flex-col items-center gap-1 text-slate-400 p-1 font-semibold text-[10px]" data-view="activities">
+        <i data-lucide="calendar" class="w-5 h-5"></i>
+        <span>Agenda</span>
+      </button>
+      <button onclick="app.navTo('history')" class="mobile-nav-btn flex flex-col items-center gap-1 text-slate-400 p-1 font-semibold text-[10px]" data-view="history">
+        <i data-lucide="clock" class="w-5 h-5"></i>
+        <span>Riwayat</span>
+      </button>
+      <button onclick="app.navTo('members')" class="mobile-nav-btn flex flex-col items-center gap-1 text-slate-400 p-1 font-semibold text-[10px]" data-view="members">
+        <i data-lucide="users" class="w-5 h-5"></i>
+        <span>Kader</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- MODAL: FORM TAMBAH ANGGOTA -->
+  <div id="modal-member" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl my-8">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div>
+          <h3 id="modal-member-title" class="text-lg font-black text-slate-900">Tambah Peserta Next Gen Leader</h3>
+          <p class="text-xs text-slate-500">Lengkapi data kader sesuai formulir registrasi Jawa Timur</p>
+        </div>
+        <button onclick="app.closeModals()" class="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-member" onsubmit="app.saveMember(event)" class="mt-4 space-y-4">
+        <input type="hidden" id="member-form-index" value="-1">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">ID Peserta / Barcode ID <span class="text-red-500">*</span></label>
+          <input type="text" id="mf-id" required placeholder="Contoh: NGL-JTM-001" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold focus:ring-2 focus:ring-amber-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Nama Lengkap <span class="text-red-500">*</span></label>
+          <input type="text" id="mf-name" required placeholder="Nama lengkap Anda" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Tempat, Tanggal Lahir <span class="text-red-500">*</span></label>
+          <input type="text" id="mf-ttl" required placeholder="Contoh: Surabaya, 12 Januari 2003" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 outline-none">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Alamat Email Aktif <span class="text-red-500">*</span></label>
+            <input type="email" id="mf-email" required placeholder="email.aktif@gmail.com" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Nomor WhatsApp yang Dapat Dihubungi <span class="text-red-500">*</span></label>
+            <input type="tel" id="mf-phone" required placeholder="08xxxxxxxxxx" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Asal Daerah / Domisili <span class="text-red-500">*</span></label>
+          <input type="text" id="mf-domisili" required placeholder="Contoh: Surabaya / Malang / Sidoarjo / Gresik" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 outline-none">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Asal Perguruan Tinggi / Kampus <span class="text-red-500">*</span></label>
+            <input type="text" id="mf-kampus" required placeholder="Contoh: UNAIR, ITS, UB, UM, UINSA" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Jurusan / Fakultas <span class="text-red-500">*</span></label>
+            <input type="text" id="mf-jurusan" required placeholder="Contoh: Sistem Informasi / Teknik" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Semester Saat Ini <span class="text-red-500">*</span></label>
+          <select id="mf-semester" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="Semester 1">Semester 1</option>
+            <option value="Semester 2">Semester 2</option>
+            <option value="Semester 3">Semester 3</option>
+            <option value="Semester 4">Semester 4</option>
+            <option value="Semester 5">Semester 5</option>
+            <option value="Semester 6">Semester 6</option>
+            <option value="Semester 7">Semester 7</option>
+            <option value="Semester 8+">Semester 8 ke atas</option>
+            <option value="Fresh Graduate / Alumni">Fresh Graduate / Alumni</option>
+          </select>
+        </div>
+
+        <div class="pt-4 flex justify-end gap-3 border-t border-slate-100">
+          <button type="button" onclick="app.closeModals()" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50">Batal</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold shadow-md">Simpan Peserta NGL</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: KARTU DIGITAL ID CARD (DIPERBAIKI STRUKTURNYA AGAR TIDAK PECAH & RESPONSIVE) -->
+  <div id="modal-id-card" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl flex flex-col items-center my-auto">
+      
+      <div class="w-full flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+        <h4 class="text-sm font-bold text-slate-800">Kartu Peserta Digital Next Gen Leader</h4>
+        <button onclick="app.closeModals()" class="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Wadah Cetak & Download -->
+      <div id="print-section" class="flex justify-center w-full my-1">
+        <div id="idcard-capture-target" class="id-card-wrap rounded-3xl p-6 text-white shadow-2xl border border-amber-400/30 relative overflow-hidden">
+          
+          <!-- Card Header -->
+          <div class="relative z-10 flex items-center justify-between border-b border-white/10 pb-3">
+            <div class="flex items-center gap-2.5">
+              <div class="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-md shrink-0">
+                <img src="LOGO NGL Jatim tnpa bckg.png" alt="NGL Logo" class="w-full h-full object-contain" onerror="this.src='Proposal NGL GMH JATIM.jpg'">
+              </div>
+              <div class="text-left">
+                <h5 class="text-xs font-black tracking-wider text-white">NEXT GEN LEADER</h5>
+                <p class="text-[9px] text-amber-300 font-bold">WILAYAH JAWA TIMUR</p>
+              </div>
+            </div>
+            <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">MEMBER</span>
+          </div>
+
+          <!-- Body Info -->
+          <div class="relative z-10 text-center flex flex-col items-center my-3">
+            <div class="w-16 h-16 rounded-2xl bg-white/10 border-2 border-amber-400/40 p-1 mb-2 shadow-lg backdrop-blur-sm flex items-center justify-center text-amber-300 text-xl font-black" id="idcard-avatar-initials">
+              AG
+            </div>
+            <h4 id="idcard-name" class="text-sm font-black text-white tracking-tight leading-tight">Nama Peserta</h4>
+            <p id="idcard-id" class="text-xs font-mono font-bold text-amber-400 mt-0.5">NGL-JTM-001</p>
+            
+            <div class="mt-2 text-center text-[10px] text-slate-300 space-y-0.5">
+              <p id="idcard-kampus" class="font-semibold text-white">Universitas Airlangga</p>
+              <p id="idcard-jurusan">Sistem Informasi • Semester 5</p>
+              <p id="idcard-domisili" class="text-amber-200/80">Domisili: Surabaya</p>
+            </div>
+          </div>
+
+          <!-- QR Code Presensi -->
+          <div class="relative z-10 bg-white p-3 rounded-2xl flex flex-col items-center justify-center shadow-lg">
+            <div id="idcard-qrcode-box" class="flex items-center justify-center w-[130px] h-[130px]"></div>
+            <p class="text-[9px] font-black font-mono text-slate-800 mt-1 uppercase tracking-wider">Scan Barcode untuk Presensi</p>
+          </div>
+
+          <!-- Card Footer -->
+          <div class="relative z-10 text-center pt-2">
+            <p class="text-[8px] text-slate-300">Official Member Card • Next Gen Leader Jawa Timur</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 w-full mt-4 no-print">
+        <button onclick="app.downloadIdCardImage()" class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold rounded-xl transition flex items-center justify-center gap-2 shadow-md">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Download (PNG)</span>
+        </button>
+        <button onclick="window.print()" class="px-4 py-2.5 border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5">
+          <i data-lucide="printer" class="w-4 h-4"></i>
+          <span>Cetak</span>
+        </button>
+        <button onclick="app.closeModals()" class="px-3 py-2.5 border border-slate-200 text-slate-600 text-xs font-semibold rounded-xl hover:bg-slate-50">
+          Tutup
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL: INPUT MANUAL -->
+  <div id="modal-manual" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl my-8">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div>
+          <h3 class="text-base font-black text-slate-900">Input Presensi Manual</h3>
+          <p class="text-xs text-slate-500">Pencatatan manual kader Next Gen Leader</p>
+        </div>
+        <button onclick="app.closeModals()" class="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form onsubmit="app.submitManualPresence(event)" class="mt-4 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Pilih Peserta <span class="text-red-500">*</span></label>
+          <select id="man-member-select" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500">
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Kegiatan <span class="text-red-500">*</span></label>
+          <select id="man-activity-select" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500">
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Sesi Presensi</label>
+            <select id="man-session-type" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500">
+              <option value="Presensi Masuk">Presensi Masuk</option>
+              <option value="Presensi Kegiatan">Presensi Kegiatan</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Status Kehadiran</label>
+            <select id="man-status" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500">
+              <option value="Hadir">Hadir</option>
+              <option value="Izin">Izin / Sakit</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Keterangan Tambahan</label>
+          <input type="text" id="man-notes" placeholder="Contoh: HP kehabisan baterai" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500">
+        </div>
+
+        <div class="pt-4 flex justify-end gap-3 border-t border-slate-100">
+          <button type="button" onclick="app.closeModals()" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50">Batal</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold shadow-md">Catat Presensi</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: BUAT / EDIT KEGIATAN -->
+  <div id="modal-activity" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl my-8">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <h3 id="modal-activity-title" class="text-lg font-black text-slate-900">Buat Kegiatan NGL Baru</h3>
+        <button onclick="app.closeModals()" class="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="form-activity" onsubmit="app.saveActivity(event)" class="mt-4 space-y-4">
+        <input type="hidden" id="activity-form-index" value="-1">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Nama Kegiatan <span class="text-red-500">*</span></label>
+          <input type="text" id="af-name" required placeholder="Contoh: Leadership Training Next Gen Leader Jatim" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Tema / Deskripsi Singkat</label>
+          <input type="text" id="af-theme" placeholder="Contoh: Membangun Pemuda Tangguh Jawa Timur" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Tanggal Kegiatan <span class="text-red-500">*</span></label>
+            <input type="date" id="af-date" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Waktu</label>
+            <input type="text" id="af-time" placeholder="08:00 - 12:00 WIB" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Lokasi Kegiatan</label>
+            <input type="text" id="af-location" placeholder="Surabaya / Malang" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Status Kegiatan</label>
+            <select id="af-status" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-amber-500">
+              <option value="Dibuka">Dibuka (Presensi Aktif)</option>
+              <option value="Mendatang">Mendatang</option>
+              <option value="Selesai">Selesai</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pt-4 flex justify-end gap-3 border-t border-slate-100">
+          <button type="button" onclick="app.closeModals()" class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50">Batal</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#14466b] hover:bg-[#0f3450] text-white text-xs font-bold shadow-md">Simpan Kegiatan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+      }
+      playSuccess() {
+        if (!this.enabled) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.type = 'sine';
+          const now = this.ctx.currentTime;
+          osc.frequency.setValueAtTime(587.33, now);
+          osc.frequency.setValueAtTime(880, now + 0.08);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } catch (e) {}
+      }
+      playError() {
+        if (!this.enabled) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.type = 'sawtooth';
+          const now = this.ctx.currentTime;
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.setValueAtTime(160, now + 0.1);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.27);
+        } catch (e) {}
+      }
+    }
+
+    const app = {
+      currentView: 'dashboard',
+      sound: new SoundEngine(),
+      members: [],
+      activities: [],
+      history: [],
+      settings: {
+        orgName: 'Next Gen Leader',
+        corwil: 'Jawa Timur',
+        cameraFacing: 'environment',
+        duplicateRule: 'block'
+      },
+
+      html5QrCode: null,
+      isScannerActive: false,
+      sessionScanCount: 0,
+      scanCooldown: false,
+      currentMemberForCard: null,
+
+      trendChart: null,
+      regionChart: null,
+      reportRegionChart: null,
+      reportSessionChart: null,
+
+      init() {
+        this.setupClock();
+        this.setupFirebaseListeners(); // Sinkronisasi Cloud Antar-Perangkat
+        this.navTo('dashboard');
+        this.initLucide();
+        this.setupEventListeners();
+      },
+
+      initLucide() {
+        if (window.lucide) window.lucide.createIcons();
+      },
+
+      /* SINKRONISASI REALTIME FIREBASE ANTAR HP / LAPTOP */
+      setupFirebaseListeners() {
+        // 1. Sinkronisasi Data Peserta
+        db.collection('members').onSnapshot(snapshot => {
+          this.members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          if (this.currentView === 'members') this.renderMembers();
+          if (this.currentView === 'dashboard') this.renderDashboard();
+          this.populateActivityDropdowns();
+        }, err => console.error("Firebase members error: ", err));
+
+        // 2. Sinkronisasi Kegiatan
+        db.collection('activities').onSnapshot(snapshot => {
+          this.activities = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          if (this.activities.length === 0) {
+            // Seed initial activity if empty
+            db.collection('activities').doc('ACT-001').set({
+              name: 'Leadership Training Next Gen Leader Jatim',
+              theme: 'Mencetak Generasi Pemimpin Berintegritas di Era Digital',
+              date: new Date().toISOString().split('T')[0],
+              time: '08:00 - 12:00 WIB',
+              location: 'Surabaya Center Hall',
+              status: 'Dibuka'
+            });
+          }
+          if (this.currentView === 'activities') this.renderActivities();
+          if (this.currentView === 'dashboard') this.renderDashboard();
+          this.populateActivityDropdowns();
+        }, err => console.error("Firebase activities error: ", err));
+
+        // 3. Sinkronisasi Log Presensi
+        db.collection('history').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+          this.history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          if (this.currentView === 'history') this.renderHistory();
+          if (this.currentView === 'dashboard') this.renderDashboard();
+          if (this.currentView === 'reports') this.renderReports();
+        }, err => console.error("Firebase history error: ", err));
+      },
+
+      setupClock() {
+        const update = () => {
+          const now = new Date();
+          const timeElem = document.getElementById('header-time');
+          const dateElem = document.getElementById('header-date');
+          if (timeElem) {
+            timeElem.innerText = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} WIB`;
+          }
+          if (dateElem) {
+            dateElem.innerText = now.toLocaleDateString('id-ID', {
+              weekday: 'long', day: 'numeric', month: 'short', year: 'numeric'
+            });
+          }
+        };
+        update();
+        setInterval(update, 1000);
+      },
+
+      setupEventListeners() {
+        const sideToggle = document.getElementById('btn-sidebar-toggle');
+        const sidebar = document.getElementById('main-sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        if (sideToggle && sidebar && backdrop) {
+          const toggleFn = () => {
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+          };
+          sideToggle.addEventListener('click', toggleFn);
+          backdrop.addEventListener('click', toggleFn);
+        }
+      },
+
+      navTo(viewName) {
+        if (this.currentView === 'scanner' && viewName !== 'scanner') {
+          this.stopScanner();
+        }
+        this.currentView = viewName;
+        ['dashboard', 'scanner', 'activities', 'members', 'history', 'reports', 'settings'].forEach(id => {
+          const el = document.getElementById(`view-${id}`);
+          if (el) el.classList.add('hidden');
+        });
+        const target = document.getElementById(`view-${viewName}`);
+        if (target) target.classList.remove('hidden');
+
+        document.querySelectorAll('.nav-item').forEach(btn => {
+          if (btn.getAttribute('data-view') === viewName) {
+            btn.classList.add('bg-amber-500/10', 'text-amber-900', 'font-bold');
+            btn.classList.remove('text-slate-600', 'hover:bg-slate-100');
+          } else {
+            btn.classList.remove('bg-amber-500/10', 'text-amber-900', 'font-bold');
+            btn.classList.add('text-slate-600', 'hover:bg-slate-100');
+          }
+        });
+
+        // Close drawer on mobile
+        const sidebar = document.getElementById('main-sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+          sidebar.classList.add('-translate-x-full');
+          if (backdrop) backdrop.classList.add('hidden');
+        }
+
+        if (viewName === 'dashboard') this.renderDashboard();
+        if (viewName === 'activities') this.renderActivities();
+        if (viewName === 'members') this.renderMembers();
+        if (viewName === 'history') this.renderHistory();
+        if (viewName === 'reports') this.renderReports();
+        if (viewName === 'settings') this.renderSettings();
+        if (viewName === 'scanner') this.setupScannerPage();
+
+        this.initLucide();
+      },
+
+      renderDashboard() {
+        const today = new Date().toISOString().split('T')[0];
+        const totalMembers = this.members.length;
+        const todayHistory = this.history.filter(h => h.date === today);
+        const uniqueToday = new Set(todayHistory.map(h => h.memberId)).size;
+        const absent = Math.max(0, totalMembers - uniqueToday);
+        const rate = totalMembers > 0 ? Math.round((uniqueToday / totalMembers) * 100) : 0;
+
+        document.getElementById('stat-total-members').innerText = totalMembers;
+        document.getElementById('stat-today-attended').innerText = uniqueToday;
+        document.getElementById('stat-today-absent').innerText = absent;
+        document.getElementById('stat-today-rate').innerText = `${rate}% dari total peserta`;
+        document.getElementById('stat-total-records').innerText = this.history.length;
+
+        const activeEvent = this.activities.find(a => a.status === 'Dibuka') || this.activities[0];
+        if (activeEvent) {
+          document.getElementById('dash-active-event-title').innerText = activeEvent.name;
+          document.getElementById('dash-active-event-details').innerText = `${activeEvent.location || 'Jawa Timur'} • Presensi Masuk Aktif`;
+        }
+
+        const tbody = document.getElementById('dashboard-recent-tbody');
+        if (tbody) {
+          tbody.innerHTML = '';
+          const recents = this.history.slice(0, 5);
+          if (recents.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-400">Belum ada presensi yang tercatat hari ini.</td></tr>`;
+          } else {
+            recents.forEach(item => {
+              const tr = document.createElement('tr');
+              tr.className = 'hover:bg-slate-50/80 transition';
+              tr.innerHTML = `
+                <td class="py-3 px-4 font-mono font-bold text-slate-800">${item.time}</td>
+                <td class="py-3 px-4 font-bold text-slate-900">${item.memberName}</td>
+                <td class="py-3 px-4 text-slate-600">${item.kampus || item.domisili || '-'}</td>
+                <td class="py-3 px-4 text-slate-600 truncate max-w-[180px]">${item.activity}</td>
+                <td class="py-3 px-4">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900">${item.sessionType}</span>
+                </td>
+                <td class="py-3 px-4 text-center">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">${item.status}</span>
+                </td>
+              `;
+              tbody.appendChild(tr);
+            });
+          }
+        }
+
+        this.renderDashboardCharts();
+      },
+
+      renderDashboardCharts() {
+        if (!window.Chart) return;
+
+        const ctxTrend = document.getElementById('chart-attendance-trend');
+        if (ctxTrend) {
+          const days = [];
+          const counts = [];
+          for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toISOString().split('T')[0];
+            days.push(d.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric' }));
+            counts.push(this.history.filter(h => h.date === dateStr).length);
+          }
+          if (this.trendChart) this.trendChart.destroy();
+          this.trendChart = new Chart(ctxTrend, {
+            type: 'line',
+            data: {
+              labels: days,
+              datasets: [{
+                label: 'Presensi',
+                data: counts,
+                borderColor: '#fab818',
+                backgroundColor: 'rgba(250, 184, 24, 0.15)',
+                borderWidth: 2.5,
+                fill: true,
+                tension: 0.35,
+                pointRadius: 4,
+                pointBackgroundColor: '#14466b'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+            }
+          });
+        }
+
+        const ctxRegion = document.getElementById('chart-attendance-region');
+        if (ctxRegion) {
+          const regMap = {};
+          this.members.forEach(m => {
+            const reg = m.domisili || 'Lainnya';
+            regMap[reg] = (regMap[reg] || 0) + 1;
+          });
+          const labels = Object.keys(regMap);
+          const data = Object.values(regMap);
+          if (this.regionChart) this.regionChart.destroy();
+          this.regionChart = new Chart(ctxRegion, {
+            type: 'doughnut',
+            data: {
+              labels: labels.length ? labels : ['Belum Ada Data'],
+              datasets: [{
+                data: data.length ? data : [1],
+                backgroundColor: ['#fab818', '#14466b', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899'],
+                borderWidth: 2,
+                borderColor: '#ffffff'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+              cutout: '68%'
+            }
+          });
+        }
+      },
+
+      setupScannerPage() {
+        this.populateActivityDropdowns();
+        const inactiveBox = document.getElementById('camera-inactive-view');
+        if (inactiveBox && !this.isScannerActive) inactiveBox.classList.remove('hidden');
+      },
+
+      startScanner() {
+        if (this.isScannerActive) return;
+        const inactiveBox = document.getElementById('camera-inactive-view');
+        const statusDot = document.getElementById('camera-status-dot');
+        const statusLabel = document.getElementById('camera-status-label');
+
+        if (inactiveBox) inactiveBox.classList.add('hidden');
+        if (statusLabel) statusLabel.innerText = 'Mengakses Kamera...';
+
+        try {
+          if (!this.html5QrCode) this.html5QrCode = new Html5Qrcode("reader");
+          const facingMode = this.settings.cameraFacing || "environment";
+          
+          this.html5QrCode.start(
+            { facingMode: facingMode },
+            { fps: 15, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+            (decodedText) => this.onQrCodeScanned(decodedText),
+            () => {}
+          ).then(() => {
+            this.isScannerActive = true;
+            if (statusDot) statusDot.className = 'w-3 h-3 rounded-full bg-emerald-400 animate-pulse';
+            if (statusLabel) statusLabel.innerText = 'Kamera Aktif';
+            this.showToast('Kamera aktif', 'success');
+          }).catch(err => {
+            this.isScannerActive = false;
+            if (inactiveBox) inactiveBox.classList.remove('hidden');
+            if (statusDot) statusDot.className = 'w-3 h-3 rounded-full bg-red-500';
+            if (statusLabel) statusLabel.innerText = 'Kamera Gagal';
+            this.showToast('Gagal membuka kamera', 'error');
+          });
+        } catch (e) {
+          if (inactiveBox) inactiveBox.classList.remove('hidden');
+        }
+      },
+
+      stopScanner() {
+        if (!this.isScannerActive || !this.html5QrCode) return;
+        this.html5QrCode.stop().then(() => {
+          this.isScannerActive = false;
+          const inactiveBox = document.getElementById('camera-inactive-view');
+          const statusDot = document.getElementById('camera-status-dot');
+          const statusLabel = document.getElementById('camera-status-label');
+          if (inactiveBox) inactiveBox.classList.remove('hidden');
+          if (statusDot) statusDot.className = 'w-3 h-3 rounded-full bg-red-500';
+          if (statusLabel) statusLabel.innerText = 'Kamera Mati';
+        }).catch(() => {});
+      },
+
+      switchCameraFacing() {
+        this.settings.cameraFacing = this.settings.cameraFacing === 'environment' ? 'user' : 'environment';
+        if (this.isScannerActive) {
+          this.stopScanner();
+          setTimeout(() => this.startScanner(), 400);
+        }
+      },
+
+      toggleSound() {
+        this.sound.enabled = !this.sound.enabled;
+        const icon = document.getElementById('sound-icon');
+        if (icon) icon.setAttribute('data-lucide', this.sound.enabled ? 'volume-2' : 'volume-x');
+        this.initLucide();
+      },
+
+      onQrCodeScanned(decodedText) {
+        if (this.scanCooldown) return;
+        this.scanCooldown = true;
+        setTimeout(() => { this.scanCooldown = false; }, 2500);
+
+        const rawCode = decodedText ? decodedText.trim() : '';
+        const member = this.members.find(m => (m.id && m.id.toLowerCase() === rawCode.toLowerCase()) || (m.customId && m.customId.toLowerCase() === rawCode.toLowerCase()));
+        const sessionType = document.getElementById('scanner-session-type').value;
+        const activitySelect = document.getElementById('scanner-activity-select');
+        const activityName = activitySelect ? activitySelect.value : 'Kegiatan NGL';
+
+        const badge = document.getElementById('scan-feedback-badge');
+        const body = document.getElementById('scan-result-body');
+
+        if (!member) {
+          this.sound.playError();
+          if (badge) {
+            badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-700';
+            badge.innerText = 'Tidak Dikenal';
+          }
+          if (body) {
+            body.innerHTML = `
+              <div class="w-20 h-20 rounded-2xl bg-red-50 text-red-500 border border-red-200 flex items-center justify-center mb-3">
+                <i data-lucide="user-x" class="w-10 h-10"></i>
+              </div>
+              <h4 class="text-base font-extrabold text-red-600">ID Tidak Ditemukan</h4>
+              <p class="text-xs text-slate-500 mt-1 max-w-xs">Kode [${rawCode}] belum terdaftar dalam Next Gen Leader JATIM.</p>
+            `;
+            this.initLucide();
+          }
+          this.showToast(`ID ${rawCode} tidak dikenal!`, 'error');
+          return;
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        const isDuplicate = this.history.some(h => 
+          h.date === today &&
+          h.memberId === member.id &&
+          h.activity === activityName &&
+          h.sessionType === sessionType
+        );
+
+        if (isDuplicate && this.settings.duplicateRule === 'block') {
+          this.sound.playError();
+          if (badge) {
+            badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800';
+            badge.innerText = 'Sudah Presensi';
+          }
+          if (body) {
+            body.innerHTML = `
+              <div class="w-20 h-20 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mb-3">
+                <i data-lucide="alert-triangle" class="w-10 h-10"></i>
+              </div>
+              <h4 class="text-base font-extrabold text-amber-700">Sudah Melakukan Presensi</h4>
+              <p class="text-sm font-bold text-slate-800 mt-1">${member.name}</p>
+              <p class="text-xs text-slate-500 mt-0.5">${member.id} • ${member.kampus || member.domisili}</p>
+              <p class="text-[11px] text-amber-700 bg-amber-50 px-3 py-1 rounded-lg border border-amber-200 mt-2">
+                Sudah tercatat pada sesi <b>${sessionType}</b> hari ini.
+              </p>
+            `;
+            this.initLucide();
+          }
+          this.showToast(`Kader ${member.name} sudah presensi`, 'warning');
+          return;
+        }
+
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\./g, ':');
+        
+        const newRecord = {
+          date: today,
+          time: timeStr,
+          memberId: member.id,
+          memberName: member.name,
+          domisili: member.domisili || '',
+          kampus: member.kampus || '',
+          activity: activityName,
+          sessionType: sessionType,
+          method: 'QR Scan Kamera',
+          status: 'Hadir',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        // Simpan Realtime ke Firebase Cloud
+        db.collection('history').add(newRecord);
+
+        this.sessionScanCount++;
+        document.getElementById('scanner-session-count').innerText = `${this.sessionScanCount} Peserta`;
+        this.sound.playSuccess();
+
+        if (badge) {
+          badge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800';
+          badge.innerText = 'Presensi Berhasil';
+        }
+        if (body) {
+          body.innerHTML = `
+            <div class="w-20 h-20 rounded-2xl bg-emerald-100 text-emerald-600 border border-emerald-300 flex items-center justify-center mb-3 shadow-md">
+              <i data-lucide="check" class="w-10 h-10 stroke-[3]"></i>
+            </div>
+            <h4 class="text-base font-extrabold text-emerald-700">Presensi Berhasil Dicatat!</h4>
+            <p class="text-sm font-bold text-slate-900 mt-1">${member.name}</p>
+            <p class="text-xs text-slate-500 mt-0.5 font-mono">${member.id} • ${member.kampus || member.domisili}</p>
+            <div class="mt-3 flex items-center gap-2">
+              <span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 text-[11px] font-bold">${sessionType}</span>
+              <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-[11px] font-mono font-bold">${timeStr} WIB</span>
+            </div>
+          `;
+          this.initLucide();
+        }
+        this.showToast(`Presensi Berhasil: ${member.name}`, 'success');
+      },
+
+      renderMembers() {
+        const tbody = document.getElementById('members-tbody');
+        const empty = document.getElementById('members-empty-state');
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+        const query = (document.getElementById('member-search-input')?.value || '').toLowerCase();
+        const filtered = this.members.filter(m => {
+          return !query || 
+            (m.name && m.name.toLowerCase().includes(query)) || 
+            (m.id && m.id.toLowerCase().includes(query)) || 
+            (m.kampus && m.kampus.toLowerCase().includes(query)) ||
+            (m.domisili && m.domisili.toLowerCase().includes(query));
+        });
+
+        if (filtered.length === 0) {
+          empty.classList.remove('hidden');
+        } else {
+          empty.classList.add('hidden');
+          filtered.forEach((m) => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50/80 transition';
+            tr.innerHTML = `
+              <td class="py-3.5 px-4">
+                <p class="font-bold text-slate-900 text-xs">${m.name || '-'}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">${m.ttl || '-'}</p>
+              </td>
+              <td class="py-3.5 px-4 font-mono font-bold text-xs text-amber-700">
+                ${m.id || '-'}
+              </td>
+              <td class="py-3.5 px-4">
+                <p class="font-semibold text-slate-800 text-xs">${m.kampus || '-'}</p>
+                <p class="text-[10px] text-slate-500">${m.jurusan || '-'} (${m.semester || '-'})</p>
+              </td>
+              <td class="py-3.5 px-4 text-slate-700 text-xs">${m.domisili || '-'}</td>
+              <td class="py-3.5 px-4 text-xs">
+                <p class="text-slate-800 font-medium">${m.phone || '-'}</p>
+                <p class="text-[10px] text-slate-400">${m.email || '-'}</p>
+              </td>
+              <td class="py-3.5 px-4 text-center">
+                <div class="flex items-center justify-center gap-1.5">
+                  <button onclick="app.showMemberCard('${m.id}')" class="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs transition flex items-center gap-1">
+                    <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+                    <span>ID Card</span>
+                  </button>
+                  <button onclick="app.confirmDeleteMember('${m.id}')" class="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition" title="Hapus Peserta">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+        this.initLucide();
+      },
+
+      filterMembers() {
+        this.renderMembers();
+      },
+
+      openMemberModal() {
+        const modal = document.getElementById('modal-member');
+        document.getElementById('form-member').reset();
+        
+        // Auto-increment nomor ID unik agar tidak selalu sama
+        const count = this.members.length + 1;
+        const nextNum = String(count).padStart(3, '0');
+        document.getElementById('mf-id').value = `NGL-JTM-${nextNum}`;
+        
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        this.initLucide();
+      },
+
+      saveMember(e) {
+        e.preventDefault();
+        const id = document.getElementById('mf-id').value.trim();
+        const name = document.getElementById('mf-name').value.trim();
+        const ttl = document.getElementById('mf-ttl').value.trim();
+        const email = document.getElementById('mf-email').value.trim();
+        const phone = document.getElementById('mf-phone').value.trim();
+        const domisili = document.getElementById('mf-domisili').value.trim();
+        const kampus = document.getElementById('mf-kampus').value.trim();
+        const jurusan = document.getElementById('mf-jurusan').value.trim();
+        const semester = document.getElementById('mf-semester').value;
+
+        if (this.members.some(m => m.id.toLowerCase() === id.toLowerCase())) {
+          this.showToast(`ID ${id} sudah terdaftar, silakan gunakan nomor ID unik!`, 'error');
+          return;
+        }
+
+        const newMember = { name, ttl, email, phone, domisili, kampus, jurusan, semester };
+        
+        // Simpan langsung ke Firestore
+        db.collection('members').doc(id).set(newMember).then(() => {
+          this.closeModals();
+          this.showToast(`Kader ${name} berhasil disimpan ke Cloud!`, 'success');
+        }).catch(err => {
+          this.showToast('Gagal menyimpan data: ' + err.message, 'error');
+        });
+      },
+
+      confirmDeleteMember(id) {
+        this.showCustomModal({
+          title: 'Hapus Peserta',
+          message: `Apakah Anda yakin ingin menghapus data kader ID [${id}] dari database cloud?`,
+          onConfirm: () => {
+            db.collection('members').doc(id).delete().then(() => {
+              this.showToast('Kader berhasil dihapus dari cloud', 'info');
+            });
+          }
+        });
+      },
+
+      /* TAMPILKAN ID CARD BESERTA QR CODE UNIK */
+      showMemberCard(memberId) {
+        const member = this.members.find(m => m.id === memberId);
+        if (!member) return;
+        this.currentMemberForCard = member;
+
+        document.getElementById('idcard-name').innerText = member.name || 'Peserta NGL';
+        document.getElementById('idcard-id').innerText = member.id || '-';
+        document.getElementById('idcard-kampus').innerText = member.kampus || 'Next Gen Leader';
+        document.getElementById('idcard-jurusan').innerText = `${member.jurusan || '-'} • ${member.semester || '-'}`;
+        document.getElementById('idcard-domisili').innerText = `Domisili: ${member.domisili || 'Jawa Timur'}`;
+        
+        const initials = (member.name || 'AG').split(' ').map(n => n[0]).slice(0, 2).join('');
+        document.getElementById('idcard-avatar-initials').innerText = initials;
+
+        // Bersihkan kontainer QR lama agar QR Code selalu sesuai dengan ID masing-masing
+        const qrContainer = document.getElementById('idcard-qrcode-box');
+        qrContainer.innerHTML = '';
+        
+        try {
+          new QRCode(qrContainer, {
+            text: member.id,
+            width: 125,
+            height: 125,
+            colorDark: "#0f172a",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+          });
+        } catch (e) {
+          console.error("QR Generate Error: ", e);
+        }
+
+        const modal = document.getElementById('modal-id-card');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        this.initLucide();
+      },
+
+      downloadIdCardImage() {
+        const cardElement = document.getElementById('idcard-capture-target');
+        if (!cardElement) return;
+
+        this.showToast('Sedang membuat file gambar ID Card...', 'info');
+
+        html2canvas(cardElement, {
+          scale: 3,
+          useCORS: true,
+          backgroundColor: null
+        }).then(canvas => {
+          const link = document.createElement('a');
+          const fileName = `ID_CARD_${this.currentMemberForCard ? this.currentMemberForCard.id : 'NGL'}.png`;
+          link.download = fileName;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+          this.showToast('ID Card berhasil didownload!', 'success');
+        }).catch(err => {
+          this.showToast('Gagal mendownload ID card', 'error');
+        });
+      },
+
+      renderActivities() {
+        const grid = document.getElementById('activities-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+
+        this.activities.forEach((act, idx) => {
+          const relatedLogs = this.history.filter(h => h.activity === act.name);
+          const attendedCount = new Set(relatedLogs.map(h => h.memberId)).size;
+          const totalMembers = this.members.length;
+          const percentage = totalMembers > 0 ? Math.round((attendedCount / totalMembers) * 100) : 0;
+
+          const card = document.createElement('div');
+          card.className = 'bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs hover:shadow-md transition flex flex-col justify-between';
+          card.innerHTML = `
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-3">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  act.status === 'Dibuka' ? 'bg-amber-100 text-amber-900 border border-amber-300' :
+                  act.status === 'Mendatang' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'
+                }">
+                  ${act.status}
+                </span>
+                <span class="text-[11px] font-mono font-bold text-slate-400">${act.date}</span>
+              </div>
+
+              <h4 class="text-base font-extrabold text-slate-900 tracking-tight leading-snug">${act.name}</h4>
+              <p class="text-xs text-slate-500 mt-1 line-clamp-2">${act.theme || 'Agenda resmi Next Gen Leader Jawa Timur'}</p>
+
+              <div class="mt-4 pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i>
+                  <span>${act.time || '08:00 WIB - Selesai'}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400"></i>
+                  <span class="truncate">${act.location || 'Jawa Timur'}</span>
+                </div>
+              </div>
+
+              <div class="mt-5 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                <div class="flex justify-between items-center text-xs mb-1.5">
+                  <span class="font-bold text-slate-700">Kehadiran Kader</span>
+                  <span class="font-extrabold text-amber-700">${attendedCount} / ${totalMembers} (${percentage}%)</span>
+                </div>
+                <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div class="h-full bg-amber-500 rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+              <button onclick="app.startScannerForEvent('${act.name}')" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs transition flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+                <span>Buka Presensi</span>
+              </button>
+
+              <div class="flex items-center gap-1">
+                <button onclick="app.openActivityModal(${idx})" class="p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition" title="Edit Kegiatan">
+                  <i data-lucide="edit-2" class="w-4 h-4"></i>
+                </button>
+                <button onclick="app.confirmDeleteActivity('${act.id}')" class="p-2 rounded-xl hover:bg-red-50 text-red-600 transition" title="Hapus Kegiatan">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+        this.initLucide();
+      },
+
+      openActivityModal(index = -1) {
+        const modal = document.getElementById('modal-activity');
+        const title = document.getElementById('modal-activity-title');
+        const form = document.getElementById('form-activity');
+        form.reset();
+
+        document.getElementById('activity-form-index').value = index;
+
+        if (index >= 0) {
+          const act = this.activities[index];
+          title.innerText = 'Edit Kegiatan NGL';
+          document.getElementById('af-name').value = act.name;
+          document.getElementById('af-theme').value = act.theme || '';
+          document.getElementById('af-date').value = act.date;
+          document.getElementById('af-time').value = act.time || '';
+          document.getElementById('af-location').value = act.location || '';
+          document.getElementById('af-status').value = act.status || 'Dibuka';
+        } else {
+          title.innerText = 'Buat Kegiatan NGL Baru';
+          document.getElementById('af-date').value = new Date().toISOString().split('T')[0];
+        }
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        this.initLucide();
+      },
+
+      saveActivity(e) {
+        e.preventDefault();
+        const index = parseInt(document.getElementById('activity-form-index').value);
+        const name = document.getElementById('af-name').value.trim();
+        const theme = document.getElementById('af-theme').value.trim();
+        const date = document.getElementById('af-date').value;
+        const time = document.getElementById('af-time').value.trim();
+        const location = document.getElementById('af-location').value.trim();
+        const status = document.getElementById('af-status').value;
+
+        const activityData = { name, theme, date, time, location, status };
+
+        if (index >= 0) {
+          const actId = this.activities[index].id;
+          db.collection('activities').doc(actId).update(activityData).then(() => {
+            this.closeModals();
+            this.showToast(`Kegiatan "${name}" berhasil diubah`, 'success');
+          });
+        } else {
+          db.collection('activities').add(activityData).then(() => {
+            this.closeModals();
+            this.showToast(`Kegiatan baru "${name}" berhasil dibuat`, 'success');
+          });
+        }
+      },
+
+      confirmDeleteActivity(id) {
+        const act = this.activities.find(a => a.id === id);
+        if (!act) return;
+
+        this.showCustomModal({
+          title: 'Hapus Kegiatan',
+          message: `Apakah Anda yakin ingin menghapus kegiatan "${act.name}" dari cloud?`,
+          onConfirm: () => {
+            db.collection('activities').doc(id).delete().then(() => {
+              this.showToast('Kegiatan telah dihapus', 'info');
+            });
+          }
+        });
+      },
+
+      startScannerForEvent(name) {
+        this.navTo('scanner');
+        const sel = document.getElementById('scanner-activity-select');
+        if (sel) sel.value = name;
+        this.startScanner();
+      },
+
+      populateActivityDropdowns() {
+        const scanSel = document.getElementById('scanner-activity-select');
+        const histSel = document.getElementById('hist-filter-activity');
+        const manSel = document.getElementById('man-activity-select');
+        const memberSel = document.getElementById('man-member-select');
+
+        const activeOptions = this.activities.map(a => `<option value="${a.name}">${a.name}</option>`).join('');
+        if (scanSel) scanSel.innerHTML = activeOptions;
+        if (histSel) histSel.innerHTML = `<option value="">Semua Kegiatan</option>` + activeOptions;
+        if (manSel) manSel.innerHTML = activeOptions;
+
+        if (memberSel) {
+          memberSel.innerHTML = this.members.map(m => 
+            `<option value="${m.id}">${m.name} (${m.id} - ${m.kampus || m.domisili})</option>`
+          ).join('');
+        }
+      },
+
+      renderHistory() {
+        const tbody = document.getElementById('history-tbody');
+        const empty = document.getElementById('history-empty-state');
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+        const query = (document.getElementById('hist-filter-search')?.value || '').toLowerCase();
+        const actFilter = document.getElementById('hist-filter-activity')?.value || '';
+        const typeFilter = document.getElementById('hist-filter-type')?.value || '';
+        const dateFilter = document.getElementById('hist-filter-date')?.value || '';
+
+        const list = this.history.filter(h => {
+          const matchQ = !query || (h.memberName && h.memberName.toLowerCase().includes(query)) || (h.memberId && h.memberId.toLowerCase().includes(query));
+          const matchA = !actFilter || h.activity === actFilter;
+          const matchT = !typeFilter || h.sessionType === typeFilter;
+          const matchD = !dateFilter || h.date === dateFilter;
+          return matchQ && matchA && matchT && matchD;
+        });
+
+        if (list.length === 0) {
+          empty.classList.remove('hidden');
+        } else {
+          empty.classList.add('hidden');
+          list.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50/80 transition';
+            tr.innerHTML = `
+              <td class="py-3 px-4">
+                <div class="font-mono font-bold text-slate-800 text-xs">${item.time} WIB</div>
+                <div class="text-[10px] text-slate-400">${item.date}</div>
+              </td>
+              <td class="py-3 px-4 font-bold text-slate-900 text-xs">${item.memberName}</td>
+              <td class="py-3 px-4 font-mono font-bold text-amber-700 text-xs">${item.memberId}</td>
+              <td class="py-3 px-4 text-slate-600">${item.kampus || item.domisili || '-'}</td>
+              <td class="py-3 px-4 text-slate-700 truncate max-w-[180px]">${item.activity}</td>
+              <td class="py-3 px-4">
+                <span class="px-2 py-0.5 rounded-lg bg-amber-50 text-amber-900 font-bold text-[10px]">${item.sessionType}</span>
+              </td>
+              <td class="py-3 px-4 text-slate-600 text-[11px]">${item.method}</td>
+              <td class="py-3 px-4 text-center">
+                <button onclick="app.confirmDeleteHistory('${item.id}')" class="p-1.5 rounded-lg hover:bg-red-50 text-red-600 transition">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+        this.initLucide();
+      },
+
+      filterHistory() {
+        this.renderHistory();
+      },
+
+      confirmDeleteHistory(logId) {
+        this.showCustomModal({
+          title: 'Hapus Entri Presensi',
+          message: 'Apakah Anda yakin ingin menghapus data presensi ini dari cloud?',
+          onConfirm: () => {
+            db.collection('history').doc(logId).delete().then(() => {
+              this.showToast('Entri presensi berhasil dihapus', 'info');
+            });
+          }
+        });
+      },
+
+      openManualModal() {
+        this.populateActivityDropdowns();
+        const modal = document.getElementById('modal-manual');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        this.initLucide();
+      },
+
+      submitManualPresence(e) {
+        e.preventDefault();
+        const memberId = document.getElementById('man-member-select').value;
+        const member = this.members.find(m => m.id === memberId);
+        if (!member) return;
+
+        const activity = document.getElementById('man-activity-select').value;
+        const sessionType = document.getElementById('man-session-type').value;
+        const status = document.getElementById('man-status').value;
+        const notes = document.getElementById('man-notes').value.trim() || 'Presensi Manual';
+
+        const today = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).replace(/\./g, ':');
+
+        const newRecord = {
+          date: today,
+          time: timeStr,
+          memberId: member.id,
+          memberName: member.name,
+          domisili: member.domisili || '',
+          kampus: member.kampus || '',
+          activity: activity,
+          sessionType: sessionType,
+          method: 'Input Manual',
+          status: status,
+          notes: notes,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        db.collection('history').add(newRecord).then(() => {
+          this.closeModals();
+          this.sound.playSuccess();
+          this.showToast(`Presensi manual untuk ${member.name} berhasil dicatat`, 'success');
+        });
+      },
+
+      renderReports() {
+        const total = this.members.length;
+        const totalLogs = this.history.length;
+        const unique = new Set(this.history.map(h => h.memberId)).size;
+        const rate = total > 0 ? Math.round((unique / total) * 100) : 0;
+
+        document.getElementById('rep-rate').innerText = `${rate}%`;
+        document.getElementById('rep-total-scans').innerText = totalLogs;
+        document.getElementById('rep-events-count').innerText = this.activities.length;
+
+        const map = {};
+        this.history.forEach(h => { map[h.memberName] = (map[h.memberName] || 0) + 1; });
+        let top = '-';
+        let max = 0;
+        for (const [k, v] of Object.entries(map)) {
+          if (v > max) { max = v; top = k; }
+        }
+        document.getElementById('rep-top-member').innerText = top;
+        document.getElementById('rep-top-member-sub').innerText = `${max} kehadiran tercatat`;
+
+        this.renderReportCharts();
+      },
+
+      renderReportCharts() {
+        if (!window.Chart) return;
+
+        const ctxReg = document.getElementById('chart-report-regions');
+        if (ctxReg) {
+          const domMap = {};
+          this.history.forEach(h => {
+            const reg = h.domisili || 'Lainnya';
+            domMap[reg] = (domMap[reg] || 0) + 1;
+          });
+          const labels = Object.keys(domMap);
+          const data = Object.values(domMap);
+
+          if (this.reportRegionChart) this.reportRegionChart.destroy();
+          this.reportRegionChart = new Chart(ctxReg, {
+            type: 'bar',
+            data: {
+              labels: labels.length ? labels : ['Belum Ada Data'],
+              datasets: [{
+                label: 'Total Kehadiran',
+                data: data.length ? data : [0],
+                backgroundColor: '#14466b',
+                borderRadius: 8
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+            }
+          });
+        }
+
+        const ctxSess = document.getElementById('chart-report-sessions');
+        if (ctxSess) {
+          const sessMap = {};
+          this.history.forEach(h => { sessMap[h.sessionType] = (sessMap[h.sessionType] || 0) + 1; });
+          const labels = Object.keys(sessMap);
+          const data = Object.values(sessMap);
+
+          if (this.reportSessionChart) this.reportSessionChart.destroy();
+          this.reportSessionChart = new Chart(ctxSess, {
+            type: 'pie',
+            data: {
+              labels: labels.length ? labels : ['Belum Ada Data'],
+              datasets: [{
+                data: data.length ? data : [1],
+                backgroundColor: ['#fab818', '#14466b']
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } }
+            }
+          });
+        }
+      },
+
+      exportHistoryCSV() {
+        if (this.history.length === 0) {
+          this.showToast('Tidak ada data presensi untuk diekspor', 'warning');
+          return;
+        }
+        const headers = ['ID Log', 'Tanggal', 'Waktu', 'ID Peserta', 'Nama Peserta', 'Domisili', 'Kampus', 'Kegiatan', 'Sesi', 'Metode', 'Status'];
+        const rows = this.history.map(item => [
+          item.id, item.date, item.time, item.memberId,
+          `"${item.memberName}"`, `"${item.domisili || ''}"`, `"${item.kampus || ''}"`,
+          `"${item.activity}"`, item.sessionType, item.method, item.status
+        ]);
+        const csv = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Presensi_NGL_JATIM_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        this.showToast('File CSV berhasil diunduh', 'success');
+      },
+
+      renderSettings() {
+        document.getElementById('setting-org-name').value = this.settings.orgName;
+        document.getElementById('setting-corwil').value = this.settings.corwil;
+        document.getElementById('setting-camera-mode').value = this.settings.cameraFacing;
+        document.getElementById('setting-duplicate-rule').value = this.settings.duplicateRule;
+      },
+
+      saveSettings() {
+        this.settings.orgName = document.getElementById('setting-org-name').value;
+        this.settings.corwil = document.getElementById('setting-corwil').value;
+        this.settings.cameraFacing = document.getElementById('setting-camera-mode').value;
+        this.settings.duplicateRule = document.getElementById('setting-duplicate-rule').value;
+        this.showToast('Pengaturan berhasil disimpan', 'success');
+      },
+
+      showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl text-xs font-semibold transform transition-all duration-300 translate-y-3 opacity-0 ${
+          type === 'success' ? 'bg-emerald-600 text-white shadow-emerald-600/30' :
+          type === 'error' ? 'bg-red-600 text-white shadow-red-600/30' :
+          type === 'warning' ? 'bg-amber-600 text-white shadow-amber-600/30' : 'bg-slate-900 text-white shadow-slate-900/30'
+        }`;
+        toast.innerHTML = `<span class="flex-1">${message}</span>`;
+        container.appendChild(toast);
+        requestAnimationFrame(() => { toast.classList.remove('translate-y-3', 'opacity-0'); });
+        setTimeout(() => {
+          toast.classList.add('opacity-0', 'translate-y-2');
+          setTimeout(() => toast.remove(), 300);
+        }, 3000);
+      },
+
+      showCustomModal({ title, message, onConfirm }) {
+        const modal = document.getElementById('custom-modal');
+        document.getElementById('custom-modal-title').innerText = title;
+        document.getElementById('custom-modal-message').innerText = message;
+        const confirmBtn = document.getElementById('custom-modal-confirm');
+        const cancelBtn = document.getElementById('custom-modal-cancel');
+        const close = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
+        cancelBtn.onclick = close;
+        confirmBtn.onclick = () => { close(); if (onConfirm) onConfirm(); };
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      },
+
+      closeModals() {
+        ['modal-member', 'modal-activity', 'modal-id-card', 'modal-manual'].forEach(id => {
+          const m = document.getElementById(id);
+          if (m) {
+            m.classList.add('hidden');
+            m.classList.remove('flex');
+          }
+        });
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      app.init();
+    });
+  </script>
+</body>
+</html>
